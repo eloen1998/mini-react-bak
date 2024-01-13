@@ -1,4 +1,5 @@
-import React from "./core/React.js";
+/** @jsx SReact.createElement */
+import SReact from "./core/React.js";
 
 // const app = React.createElement("div", { id: "app" }, React.createTextNode("hello "), "mini-react");
 
