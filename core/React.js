@@ -37,7 +37,7 @@ function runTask(fiber) {
 
     updateProps(fiber.dom, fiber.props);
 
-    fiber.parent.dom.append(fiber.dom);
+    // fiber.parent.dom.append(fiber.dom);
   }
 
   if (fiber.children) {
@@ -69,23 +69,58 @@ function runTask(fiber) {
     return fiber.sibling;
   }
 
-  return fiber.parent?.sibling;
+  let fiberParent = fiber.parent;
+
+  while (fiberParent) {
+    if (fiberParent.sibling) {
+      return fiberParent.sibling;
+    }
+    fiberParent = fiberParent.parent;
+  }
 }
 
 function render(el, container) {
   let nextTask = {
     dom: container,
-    children: [el]
+    children: [el],
+    root: true
   };
+
+  let rootTask = nextTask;
+
+  let render = false;
+
   function runTaskQueue(deadline) {
     while (deadline.timeRemaining() > 1 && nextTask) {
       nextTask = runTask(nextTask);
+    }
+
+    if (!nextTask && !render) {
+      commitCommon(rootTask);
+      render = true;
     }
 
     requestIdleCallback(runTaskQueue);
   }
 
   requestIdleCallback(runTaskQueue);
+}
+
+function commitCommon(fiber, root) {
+  if (!fiber) return;
+  if (!fiber.root) {
+    let fiberParent = fiber.parent;
+
+    while (!fiberParent.dom) {
+      fiberParent = fiberParent.parent;
+    }
+    console.log("fiberParent", fiberParent);
+
+    fiberParent.dom.append(fiber.dom);
+  }
+
+  commitCommon(fiber.child);
+  commitCommon(fiber.sibling);
 }
 
 export default {
