@@ -3,7 +3,7 @@ function createElement(type, props, ...children) {
     type,
     props,
     children: children.map((child) => {
-      if (typeof child === "string") {
+      if (["string", "number"].includes(typeof child)) {
         return createTextNode(child);
       } else {
         return child;
@@ -31,18 +31,14 @@ function updateProps(dom, props) {
   Object.assign(dom, props);
 }
 
-function runTask(fiber) {
-  if (!fiber.dom) {
-    fiber.dom = createDom(fiber.type);
-
-    updateProps(fiber.dom, fiber.props);
-
-    // fiber.parent.dom.append(fiber.dom);
+function initChildren(fiber) {
+  const children = typeof fiber.type === "function" ? [fiber.type(fiber.props)] : fiber.children;
+  if (typeof fiber.type === "function") {
   }
 
-  if (fiber.children) {
+  if (children) {
     let prevChild = null;
-    fiber.children.forEach((child) => {
+    children.forEach((child) => {
       const newFiber = {
         type: child.type,
         props: child.props,
@@ -56,10 +52,22 @@ function runTask(fiber) {
         prevChild.sibling = newFiber;
       } else {
         fiber.child = newFiber;
-        prevChild = child;
       }
+      prevChild = newFiber;
     });
   }
+}
+
+function runTask(fiber) {
+  if (typeof fiber.type !== "function") {
+    if (!fiber.dom) {
+      fiber.dom = createDom(fiber.type);
+
+      updateProps(fiber.dom, fiber.props);
+    }
+  }
+
+  initChildren(fiber);
 
   if (fiber.child) {
     return fiber.child;
@@ -106,7 +114,7 @@ function render(el, container) {
   requestIdleCallback(runTaskQueue);
 }
 
-function commitCommon(fiber, root) {
+function commitCommon(fiber) {
   if (!fiber) return;
   if (!fiber.root) {
     let fiberParent = fiber.parent;
@@ -114,9 +122,10 @@ function commitCommon(fiber, root) {
     while (!fiberParent.dom) {
       fiberParent = fiberParent.parent;
     }
-    console.log("fiberParent", fiberParent);
 
-    fiberParent.dom.append(fiber.dom);
+    if (fiber.dom) {
+      fiberParent.dom.append(fiber.dom);
+    }
   }
 
   commitCommon(fiber.child);
