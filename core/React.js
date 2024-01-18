@@ -46,6 +46,8 @@ function updateProps(dom, props, oldProps) {
   });
 }
 
+const shouldDeleteDom = [];
+
 function initChildren(fiber) {
   const children = typeof fiber.type === "function" ? [fiber.type(fiber.props)] : fiber.children;
 
@@ -54,19 +56,27 @@ function initChildren(fiber) {
   if (children) {
     let prevChild = null;
     children.forEach((child) => {
+      if (!child) {
+        console.log('aaaa')
+      }
       let newFiber;
-      if (oldFiber?.type === child.type) {
-        newFiber = {
-          type: child.type,
-          props: child.props,
-          children: child.children,
-          child: oldFiber.child,
-          parent: oldFiber.parent,
-          sibling: oldFiber.sibling,
-          dom: oldFiber.dom,
-          alternate: oldFiber,
-          commitTag: "update"
-        };
+      if (oldFiber) {
+        const isSameType = oldFiber.type === child.type;
+        if (isSameType) {
+          newFiber = {
+            type: child.type,
+            props: child.props,
+            children: child.children,
+            child: null,
+            parent: oldFiber?.parent,
+            sibling: null,
+            dom: oldFiber.dom,
+            alternate: oldFiber,
+            commitTag: "update"
+          };
+        } else {
+          shouldDeleteDom.push(oldFiber.dom);
+        }
         oldFiber = oldFiber.sibling;
       } else {
         newFiber = {
@@ -77,6 +87,7 @@ function initChildren(fiber) {
           parent: fiber,
           sibling: null,
           dom: null,
+          alternate: oldFiber,
           commitTag: "placement"
         };
       }
@@ -86,8 +97,17 @@ function initChildren(fiber) {
       } else {
         fiber.child = newFiber;
       }
-      prevChild = newFiber;
+      if (newFiber) {
+        prevChild = newFiber;
+      }
     });
+
+    while (oldFiber) {
+      if (oldFiber.dom) {
+        shouldDeleteDom.push(oldFiber.dom);
+      }
+      oldFiber = oldFiber.sibling;
+    }
   }
 }
 
@@ -138,6 +158,7 @@ function runTaskQueue(deadline) {
 
   if (!nextTask && root) {
     commitCommon(root);
+    console.log("root", root);
     preTask = root;
     root = null;
   }
@@ -163,6 +184,10 @@ function commitCommon(fiber) {
         updateProps(fiber.dom, fiber.props, fiber.alternate.props);
       }
     }
+  } else {
+    shouldDeleteDom.forEach((dom) => {
+      dom.remove();
+    });
   }
 
   commitCommon(fiber.child);
