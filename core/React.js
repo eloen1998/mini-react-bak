@@ -3,8 +3,8 @@ function createTextNode(text) {
     type: "TEXT_ELEMENT",
     props: {
       nodeValue: text,
-      children: [],
-    },
+      children: []
+    }
   };
 }
 
@@ -14,11 +14,10 @@ function createElement(type, props, ...children) {
     props: {
       ...props,
       children: children.map((child) => {
-        const isTextNode =
-          typeof child === "string" || typeof child === "number";
+        const isTextNode = typeof child === "string" || typeof child === "number";
         return isTextNode ? createTextNode(child) : child;
-      }),
-    },
+      })
+    }
   };
 }
 
@@ -26,8 +25,8 @@ function render(el, container) {
   wipRoot = {
     dom: container,
     props: {
-      children: [el],
-    },
+      children: [el]
+    }
   };
 
   nextWorkOfUnit = wipRoot;
@@ -44,8 +43,7 @@ function workLoop(deadline) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit);
 
     if (wipRoot?.sibling?.type === nextWorkOfUnit?.type) {
-      console.log("hit", wipRoot, nextWorkOfUnit);
-      nextWorkOfUnit = undefined
+      nextWorkOfUnit = undefined;
     }
 
     shouldYield = deadline.timeRemaining() < 1;
@@ -98,22 +96,10 @@ function commitWork(fiber) {
 }
 
 function createDom(type) {
-  return type === "TEXT_ELEMENT"
-    ? document.createTextNode("")
-    : document.createElement(type);
+  return type === "TEXT_ELEMENT" ? document.createTextNode("") : document.createElement(type);
 }
 
 function updateProps(dom, nextProps, prevProps) {
-  // Object.keys(nextProps).forEach((key) => {
-  //   if (key !== "children") {
-  //     if (key.startsWith("on")) {
-  //       const eventType = key.slice(2).toLowerCase();
-  //       dom.addEventListener(eventType, nextProps[key]);
-  //     } else {
-  //       dom[key] = nextProps[key];
-  //     }
-  //   }
-  // });
   // {id: "1"} {}
   // 1. old 有  new 没有 删除
   Object.keys(prevProps).forEach((key) => {
@@ -159,7 +145,7 @@ function reconcileChildren(fiber, children) {
         sibling: null,
         dom: oldFiber.dom,
         effectTag: "update",
-        alternate: oldFiber,
+        alternate: oldFiber
       };
     } else {
       if (child) {
@@ -170,12 +156,11 @@ function reconcileChildren(fiber, children) {
           parent: fiber,
           sibling: null,
           dom: null,
-          effectTag: "placement",
+          effectTag: "placement"
         };
       }
 
       if (oldFiber) {
-        console.log("should delete", oldFiber);
         deletions.push(oldFiber);
       }
     }
@@ -204,6 +189,12 @@ function reconcileChildren(fiber, children) {
 
 function updateFunctionComponent(fiber) {
   wipFiber = fiber;
+
+  // stateHook = {
+  //   state: fiber.stateHook.state
+  // };
+  stateHooks = [];
+  stateHookIndex = 0;
 
   const children = [fiber.type(fiber.props)];
 
@@ -248,11 +239,9 @@ function update() {
   let currentFiber = wipFiber;
 
   return () => {
-    console.log(currentFiber);
-
     wipRoot = {
       ...currentFiber,
-      alternate: currentFiber,
+      alternate: currentFiber
     };
 
     // wipRoot = {
@@ -265,10 +254,52 @@ function update() {
   };
 }
 
+let stateHooks;
+let stateHookIndex;
+
+function useState(initial) {
+  let currentFiber = wipFiber;
+
+  const oldHook = currentFiber.alternate?.stateHooks[stateHookIndex];
+  const stateHook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: oldHook ? oldHook.queue : []
+  };
+
+  stateHook.queue.forEach((action) => {
+    stateHook.state = action(stateHook.state);
+  });
+  stateHook.queue = [];
+  stateHookIndex++;
+  stateHooks.push(stateHook);
+
+  currentFiber.stateHooks = stateHooks;
+
+  function setState(action) {
+    const eagerState = typeof action === "function" ? action(stateHook.state) : action;
+    if (eagerState === stateHook.state) {
+      return;
+    }
+    // stateHook.state = action(stateHook.state);
+
+    stateHook.queue.push(typeof action === "function" ? action : () => action);
+
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber
+    };
+
+    nextWorkOfUnit = wipRoot;
+  }
+
+  return [stateHook.state, setState];
+}
+
 const React = {
+  useState,
   update,
   render,
-  createElement,
+  createElement
 };
 
 export default React;
